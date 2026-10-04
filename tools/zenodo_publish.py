@@ -10,7 +10,7 @@ Lessons carried over from earlier deposits: Zenodo's write schema is supplied in
 the previous version's files, which are deleted from the draft first; a new version branches from the latest
 record of the concept. The token is read from ZENODO_TOKEN and never written to disk.
 
-    python zenodo_publish.py software|preprint [--dry]
+    python zenodo_publish.py software|preprint [--dry] [--draft=ID to finish an interrupted preprint draft]
 """
 import json
 import os
@@ -74,7 +74,7 @@ version 9 adds a kinetic Monte Carlo study designed to separate static from rate
 the bistability survives on the lattice only when degradation senses order over an extended region.</p>%s
 <p>Also: an exact order&ndash;entropy bridge (dS/dU = &minus;&kappa; for the von Mises law) and the Schnakenberg entropy
 production of the maintenance cycle. Code, raw data and analysis: <a href="%s">%s</a>, archived at
-<a href="https://doi.org/%%s">%%s</a>. Version 9 also corrects the discrete-time statement of the &beta; = 0 baseline
+<a href="https://doi.org/{SW}">{SW}</a>. Version 9 also corrects the discrete-time statement of the &beta; = 0 baseline
 and the positivity condition of the entropy production (&lambda;R &gt; &epsilon;<sup>2</sup>).</p>""" % (FINDINGS, GITHUB, GITHUB)
 
 
@@ -131,21 +131,31 @@ def software():
 
 def preprint():
     sw = json.load(open(STATE))["software"]["doi"]
-    latest = req("GET", "%s/records/%s/versions/latest" % (API, PREPRINT_CONCEPT))
-    print("=== preprint concept %s -> latest record %s" % (PREPRINT_CONCEPT, latest["id"]))
-    dep = req("POST", "%s/deposit/depositions/%s/actions/newversion" % (API, latest["id"]))
-    draft = req("GET", dep["links"]["latest_draft"])
-    did = draft["id"]
-    print("   draft %s" % did)
-    for f in draft.get("files", []):
-        req("DELETE", "%s/deposit/depositions/%s/files/%s" % (API, did, f["id"]))
-    print("   inherited files removed: %d" % len(draft.get("files", [])))
-    ms = os.path.join(REPO, "manuscript")
-    for name in ("Self-Maintained_Order_Hysteretic_Collapse_v9.pdf", "Self-Maintained_Order_Hysteretic_Collapse_v9.docx",
-                 "Highlights_v9.docx", "Graphical_Abstract_v9.png"):
-        upload(draft["links"]["bucket"], os.path.join(ms, name), name)
+    names = ("Self-Maintained_Order_Hysteretic_Collapse_v9.pdf", "Self-Maintained_Order_Hysteretic_Collapse_v9.docx",
+             "Highlights_v9.docx", "Graphical_Abstract_v9.png")
+    resume = [a.split("=", 1)[1] for a in sys.argv if a.startswith("--draft=")]
+    if resume:                                   # a new-version draft already holding the v9 files
+        draft = req("GET", "%s/deposit/depositions/%s" % (API, resume[0]))
+        did = draft["id"]
+        have = sorted(f["filename"] for f in draft.get("files", []))
+        if have != sorted(names):
+            raise SystemExit("draft %s holds %s" % (did, have))
+        print("=== resuming preprint draft %s with its %d files" % (did, len(have)))
+    else:
+        latest = req("GET", "%s/records/%s/versions/latest" % (API, PREPRINT_CONCEPT))
+        print("=== preprint concept %s -> latest record %s" % (PREPRINT_CONCEPT, latest["id"]))
+        dep = req("POST", "%s/deposit/depositions/%s/actions/newversion" % (API, latest["id"]))
+        draft = req("GET", dep["links"]["latest_draft"])
+        did = draft["id"]
+        print("   draft %s" % did)
+        for f in draft.get("files", []):
+            req("DELETE", "%s/deposit/depositions/%s/files/%s" % (API, did, f["id"]))
+        print("   inherited files removed: %d" % len(draft.get("files", [])))
+        ms = os.path.join(REPO, "manuscript")
+        for name in names:
+            upload(draft["links"]["bucket"], os.path.join(ms, name), name)
     meta = {"title": TITLE_PAPER, "upload_type": "publication", "publication_type": "preprint",
-            "description": DESC_PAPER % (sw, sw), "creators": CREATORS, "keywords": KEYWORDS, "access_right": "open",
+            "description": DESC_PAPER.replace("{SW}", sw), "creators": CREATORS, "keywords": KEYWORDS, "access_right": "open",
             "license": "cc-by-4.0", "version": "9", "language": "eng",
             "related_identifiers": [
                 {"identifier": sw, "relation": "isSupplementedBy", "scheme": "doi"},
