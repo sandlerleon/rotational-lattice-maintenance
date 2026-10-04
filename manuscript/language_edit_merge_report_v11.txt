@@ -1,0 +1,61 @@
+accepted 28, rejected 18
+
+REJECT  hand review: title: 'Nondequilibrium' typo; title kept | Self-Maintained Order and Hysteretic Collapse in a Non-Equilibrium Rot
+KEEP v11 (paragraph changed in v11)  | We study the maintenance of directional order in a non-equilibrium rot
+ACCEPT  | Keywords: nonlinear dynamics; non-equilibrium statistical mechanics; b
+ACCEPT  | Many physical systems maintain order not as a thermodynamic ground sta
+ACCEPT  | The setting differs from the best-known orientational non-equilibrium 
+KEEP v11 (paragraph changed in v11)  | We formulate this as a non-equilibrium interacting particle system [18
+ACCEPT  | Let Λ = {1, …, L}2 be a square lattice with N = L2 sites and periodic 
+REJECT  hand review: 'The dynamics lead to reversible rotor relaxation with' changes what the dynamics does | The dynamics interleaves a reversible rotor relaxation with a non-cons
+REJECT  hand review: 'Therefore,' adds a logical claim the sentence does not make | so an aligned neighborhood shields a site (λi → λ0) while a disordered
+ACCEPT  | Discrete steps and continuous rates. The simulations advance in discre
+ACCEPT  | Theorem 1 (Order–entropy bridge). For the von Mises family: (i) Uχ = A
+ACCEPT  | Proof. (i) The von Mises family is an exponential family in cos θ with
+REJECT  hand review: '(iii) follows by the inverse-function theorem' became '(iii) This is followed by' | and 0 < A(κ) < 1 for κ > 0. With A(0) = 0 and the asymptotics A(κ) = 1
+ACCEPT  | Parts (i)–(iii) are instances of standard exponential-family identitie
+REJECT  hand review: run-in heading formatting changed and 'with' dropped before the defining equation | 4.1 The uncoupled baseline. Setting β = 0 removes the feedback: the in
+ACCEPT  | a globally stable fixed point approached at rate (1 + ρ); the lattice 
+ACCEPT  | Figure 2. Uncoupled baseline (β = 0, L = 48). (A) Lattice intact fract
+ACCEPT  | 4.2 Nonlinear feedback and bistability. With order-dependent degradati
+ACCEPT  | For cooperative feedback (h > 1 and β > βc(h, K)) F is non-monotonic, 
+REJECT  hand review: 'Between them three real roots exist' lost 'between them' | Proof sketch. F(I) = μ(I)(1 − I)/I → ∞ as I → 0⁺, because μ(0) = 1, an
+REJECT  hand review: bold run-in heading lowercased; 'lie at β/βc' became 'are β/βc' | Where the feedback is strong enough. Cooperativity is necessary. For h
+ACCEPT  | Figure 3 shows the S-shaped steady-state manifold, the bifurcation dia
+ACCEPT  | Figure 3. Nonlinear feedback → bistability (Proposition 2). (A) The st
+REJECT  reviewed, but numbers or sub/superscript/bold runs differ | 4.3 Testing the bistability on the lattice. Proposition 2 is a stateme
+ACCEPT  | Sweep-rate extrapolation. The ratio ρ is stepped from 16 down to 1 and
+REJECT  hand review: 'the two starts agree to within 0.004' became 'is within 0.004' | Two starts at fixed ρ. Inside the mean-field window (ρ = 4.5, 6, 8 and
+REJECT  hand review: 'are, with difference and 95% interval:' became 'are as follows: difference and ...' | The five combinations whose interval excludes zero are, with differenc
+KEEP v11 (paragraph changed in v11)  | Both tests give the same answer. At these parameters the nearest-neigh
+REJECT  hand review: 'the line is equality' became 'the line is equal' | Figure 4. Kinetic Monte Carlo test of Proposition 2 on the nearest-nei
+REJECT  hand review: 'μ(δ̄), the rate at the mean local disorder' became '... of the mean local disorder is high' | 4.4 Why the closure fails, and where it holds. The reduction assumes t
+ACCEPT  | A control experiment tests this directly. Keeping the rotor dynamics, 
+KEEP v11 (paragraph changed in v11)  | Because a separation over 2000 steps at one size does not by itself es
+ACCEPT  | The bistability of Proposition 2 is therefore not an artefact of the r
+KEEP v11 (paragraph changed in v11)  | Figure 5. Why nearest-neighbour feedback is not bistable, and the sens
+KEEP v11 (paragraph changed in v11)  | 5. The field-free transition is BKT-driven
+REJECT  hand review: 'quasilong-range' is not the established term 'quasi-long-range' | At h0 = 0 the maintained phase requires the intact sub-lattice to sust
+KEEP v11 (paragraph changed in v11)  | averaged over the two lattice directions. The Nelson–Kosterlitz criter
+ACCEPT  | Figure 6. Finite-size scaling of the field-free (h0 = 0) transition un
+ACCEPT  | The simulated dynamics is strictly irreversible: a killed site is neve
+ACCEPT  | and to leading order in ε its stationary current is the measured latti
+REJECT  hand review: 'σaux inherits from the lattice only J' became 'σaux is inherited from the lattice only J' | Figure 7 separates what is measured from what is modelled. The current
+ACCEPT  | Figure 7. Maintenance current and the auxiliary cycle. (A) Entropy pro
+REJECT  hand review: 'u_s encodes the geometry throttling the flux' became 'we encode the geometry through the flux' | The construction assumes only three ingredients: a directional order p
+REJECT  hand review: 'however slowly the sweep is made' became 'ρ−, however, slowly' | The mechanism makes a concrete prediction that does not require the ro
+ACCEPT  | The framework rests on three explicitly identified approximations. (1)
+ACCEPT  | (a) Range of the feedback and the mean-field limit: establish rigorous
+ACCEPT  | (b) Metastability and first passage: for finite sensing ranges, determ
+ACCEPT  | (c) Thermodynamics and the BKT point: a quantitative cost of maintenan
+KEEP v11 (paragraph changed in v11)  | Making degradation depend on the order it destroys turns a passive dec
+KEEP v11 (paragraph changed in v11)  | During the preparation of this revision the author used Claude (Anthro
+KEEP v11 (paragraph changed in v11)  | All Monte Carlo results of this version, the engine, its verification 
+ACCEPT  | A.1 Engine and verification. One step consists of two checkerboard Met
+REJECT  hand review: the seed-code clause was garbled ('and its study, parameter set ... are named') | A.2 Seeding and error estimates. Every run is seeded from a NumPy Seed
+ACCEPT  | A.3 Equilibration and autocorrelation. Integrated autocorrelation time
+ACCEPT  | Figure A1. Monte Carlo diagnostics. (A) Stationary autocorrelation of 
+REJECT  hand review: 'Collapsed starts at ρ = 6.5 recover' became 'Collapse starts at ρ = 6.5' | Figure A2. Extended-range bistability in size and time (4 runs per sta
+KEEP v11 (paragraph changed in v11)  | [4] F. Schl�gl, Chemical reaction models for non-equilibrium phase tra
+KEEP v11 (paragraph changed in v11)  | [6] H. Hinrichsen, Non-equilibrium critical phenomena and phase transi
+KEEP v11 (paragraph changed in v11)  | [17] F.S. Gnesotto, F. Mura, J. Gladrow, C.P. Broedersz, Broken detail
