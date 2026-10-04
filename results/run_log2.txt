@@ -1,0 +1,9 @@
+== sensing (7 workers)
+  sensing 25/128  (182 s)
+  sensing 50/128  (237 s)
+  sensing 75/128  (303 s)
+  sensing 100/128  (357 s)
+  sensing 125/128  (414 s)
+sensing done in 419 s
+== closure (7 workers)
+closure done in 286 s
