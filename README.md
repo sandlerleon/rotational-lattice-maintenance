@@ -3,11 +3,11 @@
 Leon Sandler, Independent Researcher — sandler.leon@gmail.com
 ORCID [0009-0007-4584-808X](https://orcid.org/0009-0007-4584-808X)
 
-This repository holds the kinetic Monte Carlo study behind version 9 of *"Self-Maintained Order and
+This repository holds the kinetic Monte Carlo study behind versions 9 and 10 of *"Self-Maintained Order and
 Hysteretic Collapse in a Non-Equilibrium Rotational Lattice"* (submitted to **Physica A**; preprint
-[10.5281/zenodo.21210708](https://doi.org/10.5281/zenodo.21210708)). Every number and figure in
-Sections 4.3, 4.4 and 5 and in Appendix A of the manuscript is produced by the scripts here from the raw
-run outputs that are also here.
+[10.5281/zenodo.21210708](https://doi.org/10.5281/zenodo.21210708)). Every number and every figure of the
+manuscript, including the analytic Figures 1 and 3, is produced by the scripts here, from the raw run outputs
+that are also here.
 
 ## The question
 
@@ -52,17 +52,37 @@ the few sites in disordered pockets are killed at nearly full rate (at ρ = 6, �
 Bistability is real, but it needs the degrading flux to sense order over an extended region. The range
 of the feedback is a control parameter.
 
+**In size and time (v1.1.0).** Two starts were run at L = 32, 48, 64 and 96, 4 runs each, for 15 000 steps:
+- **Global sensing** (ρ = 4.0, 4.5, 6.0, 7.0): none of the 128 runs left its branch, and the separation (0.43–0.54) is independent of L. This is the behaviour of a genuine mean-field bistability.
+- **80-site sensing, ρ = 5.5 and 6.0:** the branches persist at every size.
+- **80-site sensing, window edges:** at ρ = 5.0 the ordered state decays in 12 of 16 runs, and sooner at larger L (7 400–11 500 steps at L = 32; 1 200–5 100 at L = 96). That is nucleation. At ρ = 6.5 the collapsed state recovers in 13 of 16 runs.
+
+The finite-range case is therefore a discontinuous transition with long-lived metastability. Whether an interval of true coexistence survives N → ∞ is open (`results/extended_raw.json`, Figure A2).
+
+**Maintenance current and entropy production (Section 6).** The simulated dynamics is irreversible, so it
+has no finite Schnakenberg entropy production of its own. What is measured is the stationary current J: it
+vanishes as ρ → 0, peaks at about 0.052 per site and step near ρ = 4, where order is most fragile, and falls to
+λ₀ = 0.02 in the well-maintained regime. The entropy production in Figure 7A belongs to an auxiliary two-state
+cycle with added reverse rates ε. It is illustrative and depends on ε.
+
 **Field-free transition (Section 5).** Quenched dilution, T = 0.45, L = 16–96, 8 disorder realizations:
 the helicity modulus crosses 2T/π at f_KT(L) = 0.220 → 0.210. The 1/ln²L extrapolation gives
 **0.205 (0.193–0.216)**, and a Weber–Minnhagen fit gives **0.205 (0.198–0.213)**, χ² = 0.75 / 4 dof. Both
-are far below site percolation (0.407), so the mechanism is BKT.
+are far below site percolation (0.407), so the mechanism is BKT. Dropping the smaller lattices moves the
+estimate by less than 0.006 (all variants lie between 0.200 and 0.209), so 0.205 is a numerical estimate at
+L ≤ 96, not a precise critical value.
+
+**The two-start exceptions.** In 5 of the 40 two-start comparisons the bootstrap interval of the difference
+excludes zero. All 5 differ by at most 0.0021, with mixed signs, and none survives a Holm correction
+(smallest adjusted p = 0.70). They are listed in `results/mc_results.json` under `branches_tests`.
 
 ## Layout
 
 ```
 code/lattice_engine.py   the engine: Metropolis rotor sweeps + synchronous kill/repair; sensing = nn | rK | global
 code/test_engine.py      9 checks, incl. bit-for-bit agreement with MyUncle (run before any result)
-code/mc_study.py         six studies: hysteresis, branches, autocorr, fss, sensing, closure
+code/mc_study.py         eight studies: hysteresis, branches, autocorr, fss, sensing, closure, extended, currents
+code/figures_theory.py   Figures 1, 2, 3 and 7 (analytic, the beta = 0 baseline, and the currents of Section 6)
 code/analyze_study.py    raw runs -> results/mc_results.json and figures/Fig_*.png
 code/mf_threshold.py     beta_c(h, K) of the mean-field reduction -> results/mf_threshold.json
 results/*_raw.json       raw outputs of every run
@@ -70,8 +90,9 @@ manuscript/              manuscript v9, highlights, graphical abstract
 tools/                   Zenodo deposit scripts (token from ZENODO_TOKEN, never stored)
 ```
 
-Figure map: `Fig_lattice` = Figure 4, `Fig_mechanism` = Figure 5, `Fig_fss` = Figure 6,
-`Fig_diagnostics` = Figure A1.
+Figure map: `Fig_bridge` = Figure 1, `Fig_baseline` = Figure 2, `Fig_meanfield` = Figure 3,
+`Fig_lattice` = Figure 4, `Fig_mechanism` = Figure 5, `Fig_fss` = Figure 6, `Fig_entropy` = Figure 7,
+`Fig_diagnostics` = Figure A1, `Fig_extended` = Figure A2.
 
 ## Reproducing
 
@@ -79,8 +100,9 @@ Figure map: `Fig_lattice` = Figure 4, `Fig_mechanism` = Figure 5, `Fig_fss` = Fi
 pip install -r requirements.txt
 cd code
 python test_engine.py                       # MyUncle comparison runs if MyUncle_core is importable
-python mc_study.py all                      # about 2.5 h on 7 worker processes; --quick for a smoke test
+python mc_study.py all                      # about 4 h on 7 worker processes; --quick for a smoke test
 python analyze_study.py
+python figures_theory.py
 python mf_threshold.py
 ```
 
@@ -94,8 +116,9 @@ model-free from the plateau.
 
 ## Citation
 
-Software: [10.5281/zenodo.23130923](https://doi.org/10.5281/zenodo.23130923) (this version; concept DOI
-[10.5281/zenodo.23130922](https://doi.org/10.5281/zenodo.23130922)).
+Software: v1.1.0 (manuscript v10) [10.5281/zenodo.23131432](https://doi.org/10.5281/zenodo.23131432);
+v1.0.0 (manuscript v9) [10.5281/zenodo.23130923](https://doi.org/10.5281/zenodo.23130923); concept DOI, always
+the latest, [10.5281/zenodo.23130922](https://doi.org/10.5281/zenodo.23130922).
 The update rules are those of [MyUncle](https://github.com/sandlerleon/MyUncle)
 ([10.5281/zenodo.21223569](https://doi.org/10.5281/zenodo.21223569)).
 

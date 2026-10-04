@@ -1,0 +1,12 @@
+== extended (7 workers)
+  extended 25/256  (1000 s)
+  extended 50/256  (1750 s)
+  extended 75/256  (2177 s)
+  extended 100/256  (2543 s)
+  extended 125/256  (2836 s)
+  extended 150/256  (3093 s)
+  extended 175/256  (3315 s)
+  extended 200/256  (3490 s)
+  extended 225/256  (3645 s)
+  extended 250/256  (3766 s)
+extended done in 3796 s

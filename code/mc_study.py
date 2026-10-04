@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Monte Carlo study for the revised manuscript: six analyses that the earlier version asserted, or
+"""Monte Carlo study for the revised manuscript: eight analyses that the earlier version asserted, or
 that its approximation left untested.
 
   hysteresis  loop area of the rho sweep against dwell time per rho value and lattice size, with the
@@ -14,6 +14,11 @@ that its approximation left untested.
   sensing     the same lattice with the disorder sensed over a wider block (r = 2, 4) or globally (the mean-field
               closure imposed on the lattice): slow-sweep loops and two-start tests, to locate what removes
               the bistability
+  extended    for the two sensing ranges that look bistable (80-site block, global): long two-start runs at four
+              sizes up to L = 96 and at the edges of the window, to see whether the separation persists as N grows
+              and how often, and how soon, a run switches branch
+  currents    stationary kill and repair currents across rho (both parameter sets), for the auxiliary
+              entropy-production model of Section 6
   closure     a direct test of the one approximation of the mean-field reduction, D ~ I: in the stationary
               state, the mean local disorder of intact sites and the effective kill-rate multiplier the
               lattice actually applies, against the global information variable I = 1 - U and against
@@ -24,7 +29,7 @@ Two parameter sets are run where the question depends on them:
   cold0     T = 0.30, h0 = 0     (weaker thermal noise and no ordering field, the regime most favourable
                                   to lattice bistability)
 
-    python mc_study.py hysteresis|branches|autocorr|fss|sensing|closure|all  [--quick]
+    python mc_study.py hysteresis|branches|autocorr|fss|sensing|closure|extended|currents|all  [--quick]
 
 Every task is seeded from SeedSequence([MASTER, task code]), so any single run can be reproduced alone.
 """
@@ -312,10 +317,83 @@ def run_sensing():
     print("sensing done in %.0f s" % (time.time() - t0))
 
 
+# ======================================================================= G. extended-range bistability: size and time
+EXT_RHOS = {"r4": [5.0, 5.5, 6.0, 6.5], "global": [4.0, 4.5, 6.0, 7.0]}
+EXT_SIZES = [32, 48, 64, 96]
+EXT_STEPS, EXT_SAVE = 15000, 10
+
+
+def task_extended(args):
+    sens, L, rho, s, start = args
+    p = params("default", L).replace(sensing=sens).with_rho(rho)
+    lat = Lattice(p, seed_of(7, SENS.index(sens), L, int(rho * 10), s, start))
+    if start == 1:
+        lat.set_collapsed(0.95, random_angles=True)
+    tr = []
+    for t in range(EXT_STEPS):
+        lat.step()
+        if t % EXT_SAVE == 0:
+            tr.append(round(lat.order(), 5))
+    return sens, L, rho, s, start, tr
+
+
+def run_extended():
+    sizes = [24, 32] if QUICK else EXT_SIZES
+    seeds = 2 if QUICK else 4
+    tasks = [(sv, L, r, s, st) for sv in EXT_RHOS for L in sizes for r in EXT_RHOS[sv] for s in range(seeds) for st in (0, 1)]
+    tasks.sort(key=lambda t: -t[1] * t[1])
+    out = {}
+    t0 = time.time()
+    with Pool(NPROC) as pool:
+        for i, (sv, L, r, s, st, tr) in enumerate(pool.imap_unordered(task_extended, tasks)):
+            out.setdefault("%s|%d|%s" % (sv, L, r), {}).setdefault("ordered" if st == 0 else "collapsed", []).append({"seed": s, "U": tr})
+            if (i + 1) % 25 == 0:
+                print("  extended %d/%d  (%.0f s)" % (i + 1, len(tasks), time.time() - t0), flush=True)
+    json.dump({"rhos": EXT_RHOS, "sizes": sizes, "seeds": seeds, "steps": EXT_STEPS, "save_every": EXT_SAVE, "base": BASE,
+               "runs": out}, open(os.path.join(RES, "extended_raw.json"), "w"))
+    print("extended done in %.0f s" % (time.time() - t0))
+
+
+# ======================================================================= H. stationary currents across rho (Section 6)
+CU_RHOS = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 16.0]
+CU_EQ, CU_MEAS, CU_L = 500, 1500, 48
+
+
+def task_currents(args):
+    variant, rho, s = args
+    p = params(variant, CU_L).with_rho(rho)
+    lat = Lattice(p, seed_of(8, list(VARIANTS).index(variant), int(rho * 10), s))
+    for _ in range(CU_EQ):
+        lat.step()
+    n = CU_L * CU_L
+    kills, reps, intact_before, U = [], [], [], []
+    for _ in range(CU_MEAS):
+        intact_before.append(lat.intact_fraction())
+        k, r = lat.step()
+        kills.append(k / n)
+        reps.append(r / n)
+        U.append(lat.order())
+    return variant, rho, s, float(np.mean(kills)), float(np.mean(reps)), float(np.mean(intact_before)), float(np.mean(U))
+
+
+def run_currents():
+    seeds = 2 if QUICK else 4
+    tasks = [(v, r, s) for v in VARIANTS for r in CU_RHOS for s in range(seeds)]
+    out = []
+    t0 = time.time()
+    with Pool(NPROC) as pool:
+        for v, r, s, jk, jr, pb, u in pool.imap_unordered(task_currents, tasks):
+            out.append({"variant": v, "rho": r, "seed": s, "J_kill": jk, "J_repair": jr, "intact_before": pb, "U": u})
+    json.dump({"L": CU_L, "eq": CU_EQ, "meas": CU_MEAS, "seeds": seeds, "rhos": CU_RHOS, "variants": VARIANTS, "base": BASE,
+               "lam_eff": params("default", CU_L).lam_eff, "runs": out}, open(os.path.join(RES, "currents_raw.json"), "w"))
+    print("currents done in %.0f s" % (time.time() - t0))
+
+
 if __name__ == "__main__":
     what = [a for a in sys.argv[1:] if not a.startswith("--")] or ["all"]
     jobs = {"hysteresis": run_hysteresis, "branches": run_branches, "autocorr": run_autocorr, "fss": run_fss,
-            "closure": run_closure, "sensing": run_sensing}
+            "closure": run_closure, "sensing": run_sensing, "extended": run_extended,
+            "currents": run_currents}
     for w in (list(jobs) if what == ["all"] else what):
         print("== %s (%d workers%s)" % (w, NPROC, ", quick" if QUICK else ""), flush=True)
         jobs[w]()

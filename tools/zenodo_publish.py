@@ -10,7 +10,10 @@ Lessons carried over from earlier deposits: Zenodo's write schema is supplied in
 the previous version's files, which are deleted from the draft first; a new version branches from the latest
 record of the concept. The token is read from ZENODO_TOKEN and never written to disk.
 
-    python zenodo_publish.py software|preprint [--dry] [--draft=ID to finish an interrupted preprint draft]
+    python zenodo_publish.py software|preprint [--version=1.1.0] [--ms=10] [--dry] [--draft=ID to finish an interrupted preprint draft]
+
+A software version other than 1.0.0 is published into the new-version draft reserved by zenodo_reserve_newversion.py
+(state key software_<version>), after deleting the files it inherited.
 """
 import json
 import os
@@ -26,7 +29,9 @@ if not TOKEN:
 API = "https://zenodo.org/api"
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 STATE = os.path.join("C:" + os.sep, "YouTube", "_lattice_zenodo_state.json")
-TAG, VERSION = "v1.0.0", "1.0.0"
+VERSION = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--version=")), "1.0.0")
+TAG = "v" + VERSION
+MS_VERSION = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--ms=")), "9")
 PREPRINT_CONCEPT = "21210708"
 DRY = "--dry" in sys.argv
 GITHUB = "https://github.com/sandlerleon/rotational-lattice-maintenance"
@@ -113,7 +118,13 @@ def finish(did, meta):
 
 
 def software():
-    st = json.load(open(STATE))["software"]
+    allst = json.load(open(STATE))
+    st = allst["software"] if VERSION == "1.0.0" else allst["software_" + VERSION]
+    if VERSION != "1.0.0":
+        draft = req("GET", "%s/deposit/depositions/%s" % (API, st["id"]))
+        for f in draft.get("files", []):
+            req("DELETE", "%s/deposit/depositions/%s/files/%s" % (API, st["id"], f["id"]))
+        print("   inherited files removed: %d" % len(draft.get("files", [])))
     tmp = os.path.join(os.environ.get("TEMP", "."), "rotational-lattice-maintenance-%s.zip" % VERSION)
     subprocess.check_call(["git", "-C", REPO, "archive", "--format=zip", "--prefix=rotational-lattice-maintenance-%s/" % VERSION,
                            "-o", tmp, TAG])
@@ -130,9 +141,11 @@ def software():
 
 
 def preprint():
-    sw = json.load(open(STATE))["software"]["doi"]
-    names = ("Self-Maintained_Order_Hysteretic_Collapse_v9.pdf", "Self-Maintained_Order_Hysteretic_Collapse_v9.docx",
-             "Highlights_v9.docx", "Graphical_Abstract_v9.png")
+    allst = json.load(open(STATE))
+    sw = (allst["software"] if VERSION == "1.0.0" else allst["software_" + VERSION])["doi"]
+    v = MS_VERSION
+    names = ("Self-Maintained_Order_Hysteretic_Collapse_v%s.pdf" % v, "Self-Maintained_Order_Hysteretic_Collapse_v%s.docx" % v,
+             "Highlights_v%s.docx" % v, "Graphical_Abstract_v%s.png" % v)
     resume = [a.split("=", 1)[1] for a in sys.argv if a.startswith("--draft=")]
     if resume:                                   # a new-version draft already holding the v9 files
         draft = req("GET", "%s/deposit/depositions/%s" % (API, resume[0]))
@@ -156,7 +169,7 @@ def preprint():
             upload(draft["links"]["bucket"], os.path.join(ms, name), name)
     meta = {"title": TITLE_PAPER, "upload_type": "publication", "publication_type": "preprint",
             "description": DESC_PAPER.replace("{SW}", sw), "creators": CREATORS, "keywords": KEYWORDS, "access_right": "open",
-            "license": "cc-by-4.0", "version": "9", "language": "eng",
+            "license": "cc-by-4.0", "version": MS_VERSION, "language": "eng",
             "related_identifiers": [
                 {"identifier": sw, "relation": "isSupplementedBy", "scheme": "doi"},
                 {"identifier": GITHUB, "relation": "isSupplementedBy", "scheme": "url"},

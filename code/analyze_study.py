@@ -179,7 +179,36 @@ for key, runs in Bd["runs"].items():
         "relax_from_collapsed_median": float(np.median([x for x in tr_c if x is not None])) if any(x is not None for x in tr_c) else None,
         "relax_from_ordered_median": float(np.median([x for x in tr_o if x is not None])) if any(x is not None for x in tr_o) else None,
         "bimodality_coefficient": bimodality(pooled)}
+# per-combination Welch t-test of ordered vs collapsed start, Holm-corrected over all combinations, and the
+# combinations whose bootstrap interval excludes zero listed explicitly
+from scipy.stats import ttest_ind
+tests = []
+for key, runs in Bd["runs"].items():
+    o = np.array(runs["ordered"])[:, half:].mean(axis=1)
+    c = np.array(runs["collapsed"])[:, half:].mean(axis=1)
+    tests.append((key, float(ttest_ind(o, c, equal_var=False).pvalue)))
+m = len(tests)
+order = sorted(range(m), key=lambda i: tests[i][1])
+holm, run = {}, 0.0
+for k, i in enumerate(order):
+    run = max(run, min(1.0, (m - k) * tests[i][1]))
+    holm[tests[i][0]] = run
+exceptions = []
+for key, pw in tests:
+    v, L, rho = key.split("|")
+    b = branches[v][rho][L]
+    b["welch_p"] = pw
+    b["holm_p"] = holm[key]
+    if not (b["difference_ci95"][0] <= 0 <= b["difference_ci95"][1]):
+        exceptions.append({"variant": v, "L": int(L), "rho": float(rho), "difference": b["difference"],
+                           "ci95": b["difference_ci95"], "welch_p": pw, "holm_p": holm[key]})
 OUT["branches"] = branches
+OUT["branches_tests"] = {"n": m, "exceptions": sorted(exceptions, key=lambda e: (e["variant"], e["L"], e["rho"])),
+                         "min_holm_p": min(holm.values()),
+                         "positive_differences": int(sum(1 for v in branches for r in branches[v] for L in branches[v][r]
+                                                         if branches[v][r][L]["difference"] > 0)),
+                         "max_abs_difference": max(abs(branches[v][r][L]["difference"]) for v in branches for r in branches[v]
+                                                   for L in branches[v][r])}
 
 # ================================================================ C. autocorrelation and current balance
 A = load("autocorr_raw.json")
@@ -289,6 +318,44 @@ for _ in range(300):
 fss["weber_minnhagen"] = {"f_KT": float(fgrid[i_best]), "C": float(chis[i_best][1]),
                           "chi2_min": float(chis[i_best][0]), "dof": len(use) - 1,
                           "f_KT_ci95": [float(np.percentile(wm_boot, 2.5)), float(np.percentile(wm_boot, 97.5))]}
+# sensitivity of both extrapolations to the smallest sizes used
+sens_fss = {"lnL2": {}, "weber_minnhagen": {}}
+for Lmin in (16, 24, 32, 48):
+    keep = Ls >= Lmin
+    if keep.sum() < 3:
+        continue
+    cf = np.polyfit(X[keep], fk[keep], 1)
+    bb = []
+    for _ in range(1000):
+        fb = []
+        for L in Ls[keep]:
+            yr = np.array(Yreal[str(L)])
+            fb.append(crossing(yr[:, RNG.integers(0, yr.shape[1], yr.shape[1])].mean(axis=1)))
+        if np.all(np.isfinite(fb)):
+            bb.append(np.polyfit(X[keep], fb, 1)[1])
+    sens_fss["lnL2"][str(Lmin)] = {"sizes": Ls[keep].tolist(), "f_inf": float(cf[1]),
+                                   "f_inf_ci95": [float(np.percentile(bb, 2.5)), float(np.percentile(bb, 97.5))]}
+for Lmin in (24, 32, 48):
+    useL = [L for L in Ls if L >= Lmin]
+    lnl = np.log(np.array(useL, float))
+    pred = NK * (1 + 1 / (2 * lnl[None, :] + CGRID[:, None]))
+
+    def chi_at(f, Ym):
+        y = np.array([np.interp(f, fs, Ym[str(L)]) for L in useL])
+        sd = np.array([max(np.interp(f, fs, Yses[str(L)]), 1e-4) for L in useL])
+        c = np.sum(((y[None, :] - pred) / sd[None, :]) ** 2, axis=1)
+        return float(c.min())
+    best = fgrid[int(np.argmin([chi_at(f, Ymeans) for f in fgrid]))]
+    bb = []
+    for _ in range(300):
+        Yb = {}
+        for L in useL:
+            yr = np.array(Yreal[str(L)])
+            Yb[str(L)] = yr[:, RNG.integers(0, yr.shape[1], yr.shape[1])].mean(axis=1).tolist()
+        bb.append(float(fgrid[int(np.argmin([chi_at(f, Yb) for f in fgrid]))]))
+    sens_fss["weber_minnhagen"][str(Lmin)] = {"sizes": [int(L) for L in useL], "f_KT": float(best),
+                                              "f_KT_ci95": [float(np.percentile(bb, 2.5)), float(np.percentile(bb, 97.5))]}
+fss["sensitivity"] = sens_fss
 fss["one_minus_pc"] = 1 - 0.5927
 OUT["fss"] = fss
 
@@ -366,6 +433,48 @@ if os.path.exists(os.path.join(RES, "sensing_raw.json")):
                                                        "difference": b["difference"], "difference_ci95": b["difference_ci95"],
                                                        "note": "from study B (3000 steps, 8 seeds)"}
     OUT["sensing"] = sensing
+
+# ================================================================ G. extended-range bistability in size and time
+extended = None
+if os.path.exists(os.path.join(RES, "extended_raw.json")):
+    Ed = load("extended_raw.json")
+    dt_e = Ed["save_every"]
+    w_e = max(1, 100 // dt_e)                      # 100-step moving average
+    smE = lambda x: np.convolve(np.asarray(x, float), np.ones(w_e) / w_e, "valid")
+    UMID = 0.6                                     # between the collapsed (U < 0.5) and the ordered (U > 0.75) branches
+    T0 = 500                                       # transient allowed before a run is assigned to a branch
+    halfE = len(next(iter(Ed["runs"].values()))["ordered"][0]["U"]) // 2
+    extended = {"sizes": Ed["sizes"], "seeds": Ed["seeds"], "steps": Ed["steps"], "threshold": UMID, "transient": T0, "cases": {}}
+    for key, byst in Ed["runs"].items():
+        sv, L, rho = key.split("|")
+        rec = {}
+        for start in ("ordered", "collapsed"):
+            runs = byst[start]
+            late = np.array([np.mean(r["U"][halfE:]) for r in runs])
+            exits, exposure = [], 0.0
+            for r in runs:
+                x = smE(r["U"])
+                i0 = T0 // dt_e
+                if i0 >= len(x):
+                    continue
+                side = x[i0] > UMID
+                cross = np.where((x[i0:] > UMID) != side)[0]
+                if len(cross):
+                    exits.append(int((i0 + cross[0]) * dt_e))
+                    exposure += (cross[0]) * dt_e
+                else:
+                    exposure += (len(x) - i0) * dt_e
+            rec[start] = {"U_late": late.tolist(), "U_late_mean": float(late.mean()),
+                          "branch_at_transient": [bool(smE(r["U"])[T0 // dt_e] > UMID) for r in runs],
+                          "n_runs": len(runs), "n_exits": len(exits), "exit_steps": exits, "exposure_steps": exposure,
+                          "exit_rate_per_step": (len(exits) / exposure) if exposure > 0 else None}
+        o = np.array(rec["ordered"]["U_late"])
+        c = np.array(rec["collapsed"]["U_late"])
+        db = [o[RNG.integers(0, len(o), len(o))].mean() - c[RNG.integers(0, len(c), len(c))].mean() for _ in range(B)]
+        rec["difference"] = float(o.mean() - c.mean())
+        rec["difference_ci95"] = [float(np.percentile(db, 2.5)), float(np.percentile(db, 97.5))]
+        extended["cases"].setdefault(sv, {}).setdefault(rho, {})[L] = rec
+    OUT["extended"] = extended
 
 with open(os.path.join(RES, "mc_results.json"), "w") as f:
     json.dump(OUT, f, indent=1)
@@ -644,4 +753,43 @@ else:
 tag(ax, "D")
 fig.savefig(os.path.join(FIG, "Fig_mechanism.png"), dpi=300, bbox_inches="tight", facecolor="white")
 plt.close(fig)
+# ---- Fig_extended: extended-range bistability in size and time (Appendix, Figure A2)
+if extended:
+    fig, axs = plt.subplots(2, 2, figsize=(9.2, 7.0))
+    fig.subplots_adjust(hspace=0.42, wspace=0.30)
+    axs = axs.ravel()
+    LCOL = {32: "#9ecae1", 48: "#4292c6", 64: "#08519c", 96: "#000000"}
+    for ax, sv, title in ((axs[0], "r4", "80-site neighbourhood"), (axs[1], "global", "global sensing")):
+        cs = extended["cases"][sv]
+        for k, L in enumerate(sorted({int(L) for r in cs for L in cs[r]})):
+            rr = sorted(cs, key=float)
+            xo = [float(r) + (k - 1.5) * 0.06 for r in rr]
+            ax.plot(xo, [np.mean(cs[r][str(L)]["ordered"]["U_late"]) for r in rr], "o", color=LCOL[L], ms=6, label="L = %d" % L)
+            ax.plot(xo, [np.mean(cs[r][str(L)]["collapsed"]["U_late"]) for r in rr], "o", color=LCOL[L], ms=6, mfc="white")
+        ax.set_ylim(0, 1)
+        ax.set_xlabel(r"$\rho$")
+        ax.set_ylabel(r"$U_\chi$, second half of the run")
+        ax.set_title("%s, L = 32–96" % title, loc="left", fontsize=8.5)
+        ax.legend(frameon=False, fontsize=6.5, loc="lower right")
+    tag(axs[0], "A")
+    tag(axs[1], "B")
+    Ed = load("extended_raw.json")
+    tt = np.arange(len(Ed["runs"]["r4|32|5.0"]["ordered"][0]["U"])) * Ed["save_every"]
+    for ax, key, st, title in ((axs[2], "5.0", "ordered", r"80 sites, $\rho$ = 5.0, ordered start"),
+                               (axs[3], "6.5", "collapsed", r"80 sites, $\rho$ = 6.5, collapsed start")):
+        for L in (32, 96):
+            for j, r in enumerate(Ed["runs"]["r4|%d|%s" % (L, key)][st]):
+                ax.plot(tt[9:], np.convolve(r["U"], np.ones(10) / 10, "valid"), color=LCOL[L], lw=0.8, alpha=0.85,
+                        label="L = %d" % L if j == 0 else None)
+        ax.axhline(extended["threshold"], color="#888", ls=":", lw=0.8)
+        ax.set_ylim(0, 1)
+        ax.set_xlabel("steps")
+        ax.set_ylabel(r"$U_\chi$ (100-step average)")
+        ax.set_title(title, loc="left", fontsize=8.5)
+        ax.legend(frameon=False, fontsize=6.5, loc="center right")
+    tag(axs[2], "C")
+    tag(axs[3], "D")
+    fig.savefig(os.path.join(FIG, "Fig_extended.png"), dpi=300, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+
 print("figures written")
